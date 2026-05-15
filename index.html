@@ -1,0 +1,797 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>☢ BUSCAMINAS X ☢</title>
+
+<style>
+
+*{
+    margin:0;
+    padding:0;
+    box-sizing:border-box;
+}
+
+body{
+    min-height:100vh;
+    overflow-x:hidden;
+    background:
+    radial-gradient(circle at top,#0f2027,#000);
+    font-family:Arial;
+    color:white;
+    text-align:center;
+}
+
+canvas{
+    position:fixed;
+    top:0;
+    left:0;
+    z-index:-1;
+}
+
+h1{
+    margin-top:20px;
+    font-size:60px;
+    text-shadow:
+    0 0 10px cyan,
+    0 0 30px cyan,
+    0 0 60px cyan;
+    animation:titulo 2s infinite alternate;
+}
+
+@keyframes titulo{
+
+    from{
+        transform:scale(1);
+    }
+
+    to{
+        transform:scale(1.03);
+    }
+}
+
+#panel{
+    margin-top:20px;
+}
+
+.boton{
+    padding:15px 24px;
+    border:none;
+    border-radius:16px;
+    margin:6px;
+    color:white;
+    font-size:16px;
+    font-weight:bold;
+    cursor:pointer;
+    transition:0.25s;
+    box-shadow:0 0 20px rgba(255,255,255,0.2);
+}
+
+.boton:hover{
+    transform:scale(1.12) rotate(1deg);
+}
+
+.facil{
+    background:linear-gradient(45deg,#00b09b,#96c93d);
+}
+
+.normal{
+    background:linear-gradient(45deg,#f7971e,#ffd200);
+}
+
+.dificil{
+    background:linear-gradient(45deg,#ff416c,#ff4b2b);
+}
+
+.imposible{
+    background:linear-gradient(45deg,#8e2de2,#4a00e0);
+}
+
+.reiniciar{
+    background:linear-gradient(45deg,#2193b0,#6dd5ed);
+}
+
+#stats{
+    display:flex;
+    justify-content:center;
+    gap:25px;
+    flex-wrap:wrap;
+    margin-top:25px;
+}
+
+.card{
+    background:rgba(255,255,255,0.08);
+    backdrop-filter:blur(10px);
+    padding:18px 28px;
+    border-radius:18px;
+    box-shadow:0 0 20px rgba(0,255,255,0.2);
+    font-size:22px;
+}
+
+#mensaje{
+    margin-top:20px;
+    font-size:40px;
+    font-weight:bold;
+    text-shadow:0 0 20px white;
+}
+
+#tablero{
+    display:grid;
+    justify-content:center;
+    gap:4px;
+    margin-top:30px;
+    padding-bottom:50px;
+}
+
+.celda{
+    width:35px;
+    height:35px;
+    border:none;
+    border-radius:10px;
+    background:#1f1f1f;
+    color:white;
+    font-size:18px;
+    font-weight:bold;
+    cursor:pointer;
+    transition:0.15s;
+}
+
+.celda:hover{
+    transform:scale(1.1);
+    background:#555;
+}
+
+.abierta{
+    background:#cfcfcf;
+}
+
+.bandera{
+    background:orange;
+}
+
+.mina{
+    background:red;
+    animation:boom 0.3s infinite alternate;
+}
+
+@keyframes boom{
+
+    from{
+        transform:scale(1);
+    }
+
+    to{
+        transform:scale(1.2);
+    }
+}
+
+.ganar{
+    animation:rgb 1s infinite linear;
+}
+
+@keyframes rgb{
+
+    0%{
+        filter:hue-rotate(0deg);
+    }
+
+    100%{
+        filter:hue-rotate(360deg);
+    }
+}
+
+</style>
+</head>
+
+<body>
+
+<canvas id="fondo"></canvas>
+
+<h1>☢ BUSCAMINAS X ☢</h1>
+
+<div id="panel">
+
+<button class="boton facil"
+onclick="iniciarJuego(10,10,15)">
+🟢 Fácil
+</button>
+
+<button class="boton normal"
+onclick="iniciarJuego(15,15,40)">
+🟡 Normal
+</button>
+
+<button class="boton dificil"
+onclick="iniciarJuego(20,20,70)">
+🔴 Difícil
+</button>
+
+<button class="boton imposible"
+onclick="iniciarJuego(35,35,250)">
+🟣 Imposible
+</button>
+
+<button class="boton reiniciar"
+onclick="reiniciarJuego()">
+🔄 Reiniciar
+</button>
+
+</div>
+
+<div id="stats">
+
+<div class="card">
+⏱ Tiempo:
+<span id="tiempo">0</span>
+</div>
+
+<div class="card">
+🚩 Banderas:
+<span id="banderas">0</span>
+</div>
+
+<div class="card">
+💣 Minas:
+<span id="minas">0</span>
+</div>
+
+<div class="card">
+⭐ Puntos:
+<span id="puntos">0</span>
+</div>
+
+</div>
+
+<div id="mensaje"></div>
+
+<div id="tablero"></div>
+
+<script>
+
+const canvas =
+document.getElementById("fondo");
+
+const ctx =
+canvas.getContext("2d");
+
+canvas.width =
+window.innerWidth;
+
+canvas.height =
+window.innerHeight;
+
+let estrellas = [];
+
+for(let i=0; i<150; i++){
+
+    estrellas.push({
+
+        x:Math.random()*canvas.width,
+        y:Math.random()*canvas.height,
+        r:Math.random()*2
+
+    });
+}
+
+function animarFondo(){
+
+    ctx.clearRect(
+        0,
+        0,
+        canvas.width,
+        canvas.height
+    );
+
+    ctx.fillStyle = "white";
+
+    estrellas.forEach(e => {
+
+        ctx.beginPath();
+
+        ctx.arc(
+            e.x,
+            e.y,
+            e.r,
+            0,
+            Math.PI*2
+        );
+
+        ctx.fill();
+
+        e.y += 0.2;
+
+        if(e.y > canvas.height){
+
+            e.y = 0;
+        }
+    });
+
+    requestAnimationFrame(
+        animarFondo
+    );
+}
+
+animarFondo();
+
+let filas = 10;
+let columnas = 10;
+let minas = 15;
+
+let tablero = [];
+
+let juegoTerminado = false;
+
+let tiempo = 0;
+let puntos = 0;
+let banderas = 0;
+
+let timer;
+
+const tableroHTML =
+document.getElementById("tablero");
+
+const tiempoHTML =
+document.getElementById("tiempo");
+
+const banderasHTML =
+document.getElementById("banderas");
+
+const minasHTML =
+document.getElementById("minas");
+
+const puntosHTML =
+document.getElementById("puntos");
+
+const mensaje =
+document.getElementById("mensaje");
+
+function iniciarJuego(f,c,m){
+
+    filas = f;
+    columnas = c;
+    minas = m;
+
+    tablero = [];
+
+    juegoTerminado = false;
+
+    tiempo = 0;
+    puntos = 0;
+    banderas = 0;
+
+    clearInterval(timer);
+
+    tiempoHTML.textContent = 0;
+    puntosHTML.textContent = 0;
+    banderasHTML.textContent = 0;
+    minasHTML.textContent = minas;
+
+    mensaje.innerHTML = "";
+
+    tableroHTML.innerHTML = "";
+
+    tableroHTML.classList.remove("ganar");
+
+    tableroHTML.style.gridTemplateColumns =
+    `repeat(${columnas},35px)`;
+
+    iniciarTiempo();
+
+    crearTablero();
+}
+
+function iniciarTiempo(){
+
+    timer = setInterval(() => {
+
+        if(!juegoTerminado){
+
+            tiempo++;
+
+            tiempoHTML.textContent =
+            tiempo;
+        }
+
+    },1000);
+}
+
+function reiniciarJuego(){
+
+    iniciarJuego(
+        filas,
+        columnas,
+        minas
+    );
+}
+
+function crearTablero(){
+
+    for(let f=0; f<filas; f++){
+
+        tablero[f] = [];
+
+        for(let c=0; c<columnas; c++){
+
+            tablero[f][c] = {
+
+                mina:false,
+                abierta:false,
+                bandera:false,
+                numero:0
+
+            };
+
+            const boton =
+            document.createElement("button");
+
+            boton.classList.add("celda");
+
+            boton.dataset.fila = f;
+            boton.dataset.columna = c;
+
+            boton.addEventListener(
+                "click",
+                abrirCelda
+            );
+
+            boton.addEventListener(
+                "contextmenu",
+                ponerBandera
+            );
+
+            tableroHTML.appendChild(
+                boton
+            );
+        }
+    }
+
+    colocarMinas();
+
+    calcularNumeros();
+}
+
+function colocarMinas(){
+
+    let colocadas = 0;
+
+    while(colocadas < minas){
+
+        let f =
+        Math.floor(
+        Math.random()*filas
+        );
+
+        let c =
+        Math.floor(
+        Math.random()*columnas
+        );
+
+        if(!tablero[f][c].mina){
+
+            tablero[f][c].mina = true;
+
+            colocadas++;
+        }
+    }
+}
+
+function calcularNumeros(){
+
+    for(let f=0; f<filas; f++){
+
+        for(let c=0; c<columnas; c++){
+
+            if(tablero[f][c].mina)
+            continue;
+
+            let total = 0;
+
+            for(let df=-1; df<=1; df++){
+
+                for(let dc=-1; dc<=1; dc++){
+
+                    let nf = f + df;
+                    let nc = c + dc;
+
+                    if(
+                        nf >= 0 &&
+                        nf < filas &&
+                        nc >= 0 &&
+                        nc < columnas &&
+                        tablero[nf][nc].mina
+                    ){
+
+                        total++;
+                    }
+                }
+            }
+
+            tablero[f][c].numero =
+            total;
+        }
+    }
+}
+
+function abrirCelda(e){
+
+    if(juegoTerminado) return;
+
+    const boton = e.target;
+
+    const f =
+    parseInt(
+    boton.dataset.fila
+    );
+
+    const c =
+    parseInt(
+    boton.dataset.columna
+    );
+
+    const celda =
+    tablero[f][c];
+
+    if(
+        celda.abierta ||
+        celda.bandera
+    ) return;
+
+    celda.abierta = true;
+
+    boton.classList.add("abierta");
+
+    if(celda.mina){
+
+        boton.textContent = "💣";
+
+        boton.classList.add("mina");
+
+        perderJuego();
+
+        return;
+    }
+
+    puntos += 10;
+
+    puntosHTML.textContent =
+    puntos;
+
+    if(celda.numero > 0){
+
+        boton.textContent =
+        celda.numero;
+
+        colorNumero(
+            boton,
+            celda.numero
+        );
+
+    }else{
+
+        for(let df=-1; df<=1; df++){
+
+            for(let dc=-1; dc<=1; dc++){
+
+                let nf = f + df;
+                let nc = c + dc;
+
+                if(
+                    nf >= 0 &&
+                    nf < filas &&
+                    nc >= 0 &&
+                    nc < columnas
+                ){
+
+                    if(
+                    !tablero[nf][nc]
+                    .abierta
+                    ){
+
+                        const vecino =
+                        document
+                        .querySelector(
+                        `[data-fila='${nf}'][data-columna='${nc}']`
+                        );
+
+                        vecino.click();
+                    }
+                }
+            }
+        }
+    }
+
+    verificarVictoria();
+}
+
+function ponerBandera(e){
+
+    e.preventDefault();
+
+    if(juegoTerminado) return;
+
+    const boton = e.target;
+
+    const f =
+    boton.dataset.fila;
+
+    const c =
+    boton.dataset.columna;
+
+    const celda =
+    tablero[f][c];
+
+    if(celda.abierta) return;
+
+    celda.bandera =
+    !celda.bandera;
+
+    if(celda.bandera){
+
+        boton.textContent = "🚩";
+
+        boton.classList.add(
+            "bandera"
+        );
+
+        banderas++;
+
+    }else{
+
+        boton.textContent = "";
+
+        boton.classList.remove(
+            "bandera"
+        );
+
+        banderas--;
+    }
+
+    banderasHTML.textContent =
+    banderas;
+
+    minasHTML.textContent =
+    minas - banderas;
+}
+
+function colorNumero(
+    boton,
+    numero
+){
+
+    if(numero == 1)
+    boton.style.color =
+    "#00bfff";
+
+    if(numero == 2)
+    boton.style.color =
+    "#00ff99";
+
+    if(numero == 3)
+    boton.style.color =
+    "#ff4444";
+
+    if(numero == 4)
+    boton.style.color =
+    "#bb66ff";
+
+    if(numero >= 5)
+    boton.style.color =
+    "#ffee00";
+}
+
+function mostrarMinas(){
+
+    const botones =
+    document.querySelectorAll(
+    ".celda"
+    );
+
+    botones.forEach(boton => {
+
+        const f =
+        boton.dataset.fila;
+
+        const c =
+        boton.dataset.columna;
+
+        if(tablero[f][c].mina){
+
+            boton.textContent =
+            "💣";
+
+            boton.classList.add(
+            "mina"
+            );
+        }
+    });
+}
+
+function perderJuego(){
+
+    juegoTerminado = true;
+
+    clearInterval(timer);
+
+    mostrarMinas();
+
+    mensaje.innerHTML =
+    "💥 GAME OVER 💥";
+
+    mensaje.style.color =
+    "red";
+
+    vibrarPantalla();
+}
+
+function vibrarPantalla(){
+
+    document.body.animate([
+
+        {
+            transform:
+            "translateX(-10px)"
+        },
+
+        {
+            transform:
+            "translateX(10px)"
+        },
+
+        {
+            transform:
+            "translateX(0px)"
+        }
+
+    ],{
+
+        duration:300,
+        iterations:3
+    });
+}
+
+function verificarVictoria(){
+
+    let abiertas = 0;
+
+    for(let f=0; f<filas; f++){
+
+        for(let c=0; c<columnas; c++){
+
+            if(
+            tablero[f][c].abierta
+            ){
+
+                abiertas++;
+            }
+        }
+    }
+
+    if(
+    abiertas ===
+    (filas*columnas)-minas
+    ){
+
+        juegoTerminado = true;
+
+        clearInterval(timer);
+
+        tableroHTML.classList.add(
+        "ganar"
+        );
+
+        mensaje.innerHTML =
+        "🏆 VICTORIA TOTAL 🏆";
+
+        mensaje.style.color =
+        "#00ffcc";
+    }
+}
+
+iniciarJuego(10,10,15);
+
+</script>
+
+</body>
+</html>
